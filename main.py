@@ -1,899 +1,240 @@
-import kagglehub
-
-# Download latest version
-path = kagglehub.dataset_download("syedanwarafridi/vehicle-sales-data")
-
-print("Path to dataset files:", path)
-
+import streamlit as st
 import pandas as pd
 import seaborn as sns
 import numpy as np
 import matplotlib.pyplot as plt
-
-
-
-dataset = pd.read_csv('Data Kaggle Car_Prices.csv')
-
-
-dataset.head(5)
-
-
-
-#menyimpan variabel vin dan saledate karena tidak digunakan
-vin = dataset['vin']
-saledate = dataset['saledate']
-
-#menghapus kolom vin dan saledatae
-dataset = dataset.drop(columns=['vin', 'saledate'])
-
-dataset.shape
-
-dataset.describe()
-
-dataset.dtypes
-
-
-# Check data types for each column and identify columns with mixed data types, including counts
-def check_mixed_data_types_with_counts(df):
-    mixed_type_columns = {}
-    for col in df.columns:
-        type_counts = df[col].apply(type).value_counts().to_dict()
-        if len(type_counts) > 1:
-            mixed_type_columns[col] = type_counts
-    return mixed_type_columns
-
-mixed_types_with_counts = check_mixed_data_types_with_counts(dataset)
-
-if mixed_types_with_counts:
-    print("Columns with mixed data types and their counts:")
-    for col, types in mixed_types_with_counts.items():
-        print(f"- {col}: {types}")
-else:
-    print("No columns with mixed data types found.")
-
-# Additionally, print the data types of each column as initially inferred by pandas
-print("\nData types inferred by pandas:")
-print(dataset.dtypes)
-
-
-# Define the columns to check for mixed types
-cols_to_check = ['make', 'model', 'trim', 'body', 'transmission', 'color', 'interior']
-
-# Create a dictionary to store the counts of replaced float values
-replaced_counts = {}
-
-# Iterate through the specified columns and replace float values with NaN
-for col in cols_to_check:
-    # Count the number of float values before replacement
-    float_count = dataset[col].apply(lambda x: isinstance(x, float)).sum()
-    replaced_counts[col] = float_count
-
-    # Replace float values with NaN
-    dataset[col] = dataset[col].apply(lambda x: np.nan if isinstance(x, float) else x)
-
-print("Float data types in specified columns have been replaced with NaN.")
-print("\nNumber of float values replaced with NaN in each column:")
-for col, count in replaced_counts.items():
-    print(f"- {col}: {count}")
-
-"""##3.3. Check Missing Value"""
-
-# Check the NaN of the train set by ploting percent of missing values per column
-column_with_nan = dataset.columns[dataset.isnull().any()]
-column_name = []
-percent_nan = []
-
-for i in column_with_nan:
-    column_name.append(i)
-    nan_percentage = round(dataset[i].isnull().sum()*100/len(dataset), 2)
-    percent_nan.append(nan_percentage)
-
-tab = pd.DataFrame(column_name, columns=["Column"])
-tab["Percent_NaN"] = percent_nan
-tab.sort_values(
-    by=["Percent_NaN"],
-    ascending=False,
-    inplace=True
-)
-
-# Define figure parameters
-sns.set(rc={"figure.figsize":(10, 7)})
-sns.set_style("whitegrid")
-fontsize=15
-
-# Plot results
-p = sns.barplot(
-    x="Percent_NaN",
-    y="Column",
-    data=tab,
-    edgecolor="black",
-    color="deepskyblue"
-)
-
-p.set_title("Percentage of NaN per Column of the Train Set", fontsize=fontsize)
-p.set_xlabel("Percent of NaN (%)", fontsize=fontsize)
-p.set_ylabel("Column Name", fontsize=fontsize);
-
-tab
-
-dataset.isna().sum()
-
-
-
-dataset_num = dataset.select_dtypes(exclude=['object'])
-dataset_num.head()
-
-dataset_num.shape
-
-
-
-import matplotlib.pyplot as plt
 from scipy.stats import skew, kurtosis
-
-# Set the style for the plots
-sns.set(style="whitegrid")
-
-# Get the list of numerical columns
-numerical_cols = dataset_num.columns
-
-# Determine the number of rows and columns for the subplots
-n_cols = 3
-n_rows = (len(numerical_cols) + n_cols - 1) // n_cols
-
-# Create subplots
-fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows * 5))
-axes = axes.flatten() # Flatten the axes array for easy iteration
-
-# Plot the distribution for each numerical column using histplot with kde
-for i, col in enumerate(numerical_cols):
-    sns.histplot(data=dataset_num, x=col, kde=True, ax=axes[i]) # Use histplot with kde
-
-    # Calculate skewness and kurtosis
-    col_skew = skew(dataset_num[col].dropna())
-    col_kurtosis = kurtosis(dataset_num[col].dropna())
-
-    # Determine distribution type based on skewness and kurtosis
-    dist_type = "Approximately Normal"
-    if abs(col_skew) > 0.5: # A common threshold for moderate skewness
-        dist_type = "Skewed"
-    if abs(col_kurtosis) > 1: # A common threshold for kurtosis indicating peaked or flat distribution
-        dist_type += f", Kurtosis: {col_kurtosis:.2f}"
-
-
-    axes[i].set_title(f'Distribution of {col} ({dist_type})')
-    axes[i].set_xlabel(col)
-    axes[i].set_ylabel('Frequency')
-
-# Hide any unused subplots
-for j in range(i + 1, len(axes)):
-    fig.delaxes(axes[j])
-
-plt.tight_layout()
-plt.show()
-
-
-# Calculate the correlation matrix
-correlation_matrix = dataset_num.corr()
-
-# Create the heatmap
-plt.figure(figsize=(10, 8))
-sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title('Heatmap of Numerical Feature Correlation')
-plt.show()
-
-"""###3.4.3. Fill Missing Value"""
-
-# Fill missing values in specified numerical columns with their median
-cols_to_fill = ['condition', 'odometer', 'mmr', 'sellingprice']
-dataset_num_imputed = dataset_num.copy()
-
-for col in cols_to_fill:
-    # Get the number of missing values before filling
-    missing_count_before = dataset_num[col].isnull().sum()
-
-    median_value = dataset_num[col].median()
-    dataset_num_imputed[col].fillna(median_value, inplace=True)
-    print(f"Filled {missing_count_before} missing values in '{col}' with the median ({median_value}).")
-
-# Verify that there are no more missing values in these columns
-print("\nMissing values after filling:")
-print(dataset_num_imputed[cols_to_fill].isnull().sum())
-
-
-
-# Let's check the distribution of each imputed feature before and after imputation
-
-# Define figure parameters
-sns.set(rc={"figure.figsize": (14, 12)})
-sns.set_style("whitegrid")
-fig, axes = plt.subplots(3, 2)
-fontsize=10
-# Plot the results
-for feature, fig_pos in zip(["condition", "odometer", "mmr"], [0, 1, 2]):
-
-
-    # before imputation
-    p = sns.histplot(
-        ax=axes[fig_pos, 0],
-        x=dataset_num[feature],
-        kde=True,
-        bins=30,
-        color="deepskyblue",
-        edgecolor="black"
-    )
-    p.set_ylabel(f"Before imputation", fontsize=fontsize)
-
-    # after imputation
-    q = sns.histplot(
-        ax=axes[fig_pos, 1],
-        x=dataset_num_imputed[feature],
-        kde=True,
-        bins=30,
-        color="darkorange",
-        edgecolor="black"
-    )
-    q.set_ylabel(f"After imputation", fontsize=fontsize)
-
-
-# Calculate the correlation matrix for the imputed numerical dataset
-correlation_matrix_imputed = dataset_num_imputed.corr()
-
-# Create the heatmap
-plt.figure(figsize=(10, 8))
-sns.heatmap(correlation_matrix_imputed, annot=True, cmap='coolwarm', fmt=".2f")
-plt.title('Heatmap of Imputed Numerical Feature Correlation')
-plt.show()
-
-"""###3.4.6. Correlation to Sellingprice"""
-
-# Calculate correlation with 'SalePrice' for numerical features
-correlation_with_saleprice = dataset_num_imputed.corr()["sellingprice"][:-1]
-
-# Identify strongly correlated features (correlation coefficient >= 0.5)
-strong_correlations = (
-    correlation_with_saleprice[abs(correlation_with_saleprice) >= 0.5]
-    .sort_values(ascending=False)
-)
-print(f"{len(strong_correlations)} strongly correlated features with SellingPrice:")
-print(strong_correlations)
-
-print("\n-------------------------#######-------------------------\n")
-
-# Identify moderately correlated features (0.3 <= correlation coefficient < 0.5)
-moderate_correlations = (
-    correlation_with_saleprice[(abs(correlation_with_saleprice) < 0.5) \
-    & (abs(correlation_with_saleprice) >= 0.3)]
-    .sort_values(ascending=False)
-)
-print(f"{len(moderate_correlations)} moderately correlated features with SellingPrice:")
-print(moderate_correlations)
-
-strong_correlations.index.tolist()
-
-# Features with high correlation (higher than 0.5)
-strong_features = strong_correlations.index.tolist()
-strong_features.append("sellingprice")
-df_strong_features = dataset_num_imputed.loc[:, strong_features]
-
-sns.set_style("whitegrid")  # define figures style
-
-# Calculate the number of rows and columns for subplots
-n_rows = (len(strong_features) -1 + 2) // 3  # Ensure enough rows
-n_cols = min(3, len(strong_features) - 1)
-
-
-fig, axes = plt.subplots(
-    n_rows,
-    n_cols,
-    figsize=(15, 5 * n_rows),
-    sharey=True
-)
-
-# Flatten the axes array for easier iteration
-axes = axes.flatten()
-
-for i in range(len(strong_features) - 1):
-    sns.regplot(
-        x=strong_features[i],
-        y="sellingprice",
-        data=df_strong_features,
-        ax=axes[i],
-        scatter_kws={"color": "deepskyblue"},
-        line_kws={"color": "black"},
-    )
-    axes[i].set_xlabel(strong_features[i]) # Set xlabel for each subplot
-
-
-# Turn off any unused subplots
-for i in range(len(strong_features) - 1, len(axes)):
-    axes[i].set_axis_off()
-
-
-plt.tight_layout()
-plt.show()
-
-# Features with moderate correlation (0.3 <= correlation coefficient < 0.5)
-moderate_features = moderate_correlations.index.tolist()
-moderate_features.append("sellingprice")
-df_moderate_features = dataset_num_imputed.loc[:, moderate_features]
-
-sns.set_style("whitegrid")  # define figures style
-
-# Calculate the number of rows and columns for subplots
-n_rows = (len(moderate_features) - 1 + 2) // 3  # Ensure enough rows
-n_cols = min(3, len(moderate_features) - 1)
-
-fig, axes = plt.subplots(
-    n_rows,
-    n_cols,
-    figsize=(15, 5 * n_rows),
-    sharey=True
-)
-
-# Flatten the axes array for easier iteration
-if n_rows * n_cols > 1:
-    axes = axes.flatten()
-else:
-    axes = [axes] # Wrap the single Axes object in a list for consistent iteration
-
-for i in range(len(moderate_features) - 1):
-    sns.regplot(
-        x=moderate_features[i],
-        y="sellingprice",
-        data=df_moderate_features,
-        ax=axes[i],
-        scatter_kws={"color": "deepskyblue"},
-        line_kws={"color": "black"},
-    )
-    axes[i].set_xlabel(moderate_features[i])  # Set xlabel for each subplot
-
-# Turn off any unused subplots
-for i in range(len(moderate_features) - 1, len(axes)):
-    axes[i].set_axis_off()
-
-plt.tight_layout()
-plt.show()
-
-"""##3.5. Categorical Features
-
-###3.5.1 Explore and Clean Categorical Features
-"""
-
-# Categorical to Quantitative relationship
-
-# categorical_features = [i for i in df_train.columns if df_train.dtypes[i] == "object"] # -->list comprehension
-# for-loop
-categorical_features = []
-for feat, feat_type in zip(dataset.columns, dataset.dtypes):
-    if feat_type == 'object':
-       categorical_features.append(feat)
-
-# Include target variable
-categorical_features.append("sellingprice")
-
-dataset_categ = dataset[categorical_features]
-
-dataset_categ.head()
-
-# Countplot for each of the categorical features in the train set
-fig, axes = plt.subplots(
-    nrows=round(len(dataset_categ.columns) / 3),
-    ncols=3,
-    figsize=(12, 30)
-)
-
-for i, ax in enumerate(axes.flatten()):  # Iterate through flattened axes array
-    if i < (len(dataset_categ.columns)-1): # -1 because we exclude SalePrice
-
-        sns.countplot(
-            x=dataset_categ.columns[i],
-            alpha=0.7,
-            data=dataset_categ,
-            ax=ax
-        )
-
-        ax.tick_params(
-            axis='x',
-            rotation=45
-        )
-    else:
-        ax.set_axis_off() # Hide empty subplots
-
-fig.tight_layout()
-plt.show()
-
-# Calculate and print the number of unique categories for each categorical feature
-for col in dataset_categ.columns:
-    if col != 'sellingprice': # Exclude the target variable
-        num_unique = dataset_categ[col].nunique()
-        print(f"Column '{col}': {num_unique} unique categories")
-
-"""###3.5.2 Delete Data"""
-
-# Replace 'sedan' with NaN in the 'transmission' column
-dataset_categ['transmission'] = dataset_categ['transmission'].replace('sedan', np.nan)
-dataset_categ['transmission'] = dataset_categ['transmission'].replace('Sedan', np.nan)
-
-print("Replaced 'sedan' with NaN in the 'transmission' column.")
-
-# Calculate and print the number of unique categories for each categorical feature
-for col in dataset_categ.columns:
-    if col != 'sellingprice': # Exclude the target variable
-        num_unique = dataset_categ[col].nunique()
-        print(f"Column '{col}': {num_unique} unique categories")
-
-"""###3.5.2. Fill Missing Value"""
-
-# Define the columns to fill with 'others'
-dataset_categ_imputed = dataset_categ.copy()
-
-# Fill missing values in specified categorical columns with 'others'
-cols_to_fill_categorical = ['make', 'model', 'trim', 'body', 'transmission', 'color', 'interior']
-
-# Fill missing values in specified categorical columns with 'others'
-for col in cols_to_fill_categorical:
-    # Get the number of missing values before filling
-    missing_count_before = dataset_categ[col].isnull().sum()
-
-    dataset_categ_imputed[col].fillna('others', inplace=True)
-    print(f"Filled {missing_count_before} missing values in '{col}' with 'others'.")
-
-# Verify that there are no more missing values in these columns
-print("\nMissing values after filling:")
-print(dataset_categ_imputed[cols_to_fill_categorical].isnull().sum())
-
-# With the boxplot we can see the variation of the target 'SalePrice'
-# in each of the categorical features
-
-fig, axes = plt.subplots(
-    nrows=round(len(dataset_categ_imputed.columns)/3),
-    ncols=3,
-    figsize=(15, 30)
-)
-
-for i, ax in enumerate(fig.axes):
-    # plot the variation of SalePrice in each feature
-    if i < len(dataset_categ_imputed.columns) - 1:
-
-        sns.boxplot(
-            x=dataset_categ_imputed.columns[i],
-            y="sellingprice",
-            data=dataset_categ_imputed,
-            ax=ax
-        )
-
-        ax.tick_params(
-            axis='x',
-            rotation=45
-        )
-    else:
-        ax.set_axis_off() # Hide empty subplots
-
-fig.tight_layout()
-plt.show()
-
-"""##3.5. Combine Numerical dan Categorical Features"""
-
-# Drop the 'sellingprice' column from dataset_categ_imputed
-if 'sellingprice' in dataset_categ_imputed.columns:
-    dataset_categ_imputed = dataset_categ_imputed.drop(columns=['sellingprice'])
-    print("The 'sellingprice' column has been removed from dataset_categ_imputed.")
-else:
-    print("The 'sellingprice' column does not exist in dataset_categ_imputed.")
-
-dataset_new = dataset_num_imputed.join(dataset_categ_imputed)
-dataset_new.head()
-
-# Store the sellingprice column
-sellingprice = dataset_new['sellingprice']
-
-# Drop the sellingprice column
-dataset_new = dataset_new.drop(columns=['sellingprice'])
-
-# Add sellingprice back at the end
-dataset_new['sellingprice'] = sellingprice
-
-print("The 'sellingprice' column has been moved to the end of the DataFrame.")
-display(dataset_new.head())
-
-
-
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder, StandardScaler
-import pandas as pd
-
-# Save sellingprice so it won't be scaled
-sellingprice = dataset_new['sellingprice']
-
-"""##4.1. One-Hot Encoding"""
-
-# --- One-Hot Encoding for the 'transmission' column ---
-if 'transmission' in dataset_new.columns:
-    ohe = OneHotEncoder(sparse_output=False, drop=None)
-    transmission_encoded = ohe.fit_transform(dataset_new[['transmission']])
-    transmission_df = pd.DataFrame(
-        transmission_encoded,
-        columns=[f"transmission_{cat}" for cat in ohe.categories_[0]],
-        index=dataset_new.index
-    )
-    dataset_new = pd.concat([dataset_new.drop(columns=['transmission']), transmission_df], axis=1)
-
-"""##4.2. Label Encoding"""
-
-# --- Label Encoding for other categorical columns ---
-categorical_cols = dataset_new.select_dtypes(include=['object']).columns
-for col in categorical_cols:
-    le = LabelEncoder()
-    dataset_new[col] = le.fit_transform(dataset_new[col])
-
-"""##4.3. Feature Scalling"""
-
-# --- Feature Scaling for all columns except 'sellingprice' ---
-scaler = StandardScaler()
-cols_to_scale = dataset_new.columns.drop('sellingprice')
-dataset_new[cols_to_scale] = scaler.fit_transform(dataset_new[cols_to_scale])
-
-# Put 'sellingprice' back to the last position
-dataset_new['sellingprice'] = sellingprice
-
-# Save the final result
-dataset_feature = dataset_new
-
-# Display the result
-dataset_feature.head()
-
-"""#5.&nbsp;Preparing Data for Modelling
-
-##5.1. Variabel Target
-
-##5.2 Data Splitting
-"""
-
-from sklearn.model_selection import train_test_split
-
-X = dataset_feature.drop(columns=['sellingprice'])
-y = dataset_feature['sellingprice']
-
-# Split dataset 80% train dan 20% test secara random
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
-
-# Simpan hasil data train tanpa kolom sellingprice
-dataset_train_x = X_train.copy()
-dataset_train_x.head()
-
-# Simpan hasil data train objective (kolom sellingprice saja)
-dataset_train_y = y_train.copy()
-dataset_train_y.head()
-
-dataset_train_x.isna().sum()
-
-# Simpan hasil data test tanpa kolom sellingprice
-dataset_test_x = X_test.copy()
-dataset_test_x.head()
-
-# Simpan hasil data test objective (kolom sellingprice saja)
-dataset_test_y = y_test.copy()
-dataset_test_y.head()
-
-"""#6.&nbsp;Modelling
-
-##6.1. Models and Metrics Selection
-
-##6.2. Hyperparameters Tuning and Model Optimization
-"""
-
-import sklearn
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.linear_model import Ridge, Lasso, ElasticNet
+from sklearn.linear_model import Ridge, Lasso, LinearRegression
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
 from lightgbm import LGBMRegressor
-
-# Let's define a function for each metrics
-# R²
-def rsqr_score(test, pred):
-
-    r2_ = r2_score(test, pred)
-    return r2_
-
-
-# RMSE
-def rmse_score(test, pred):
-
-    rmse_ = np.sqrt(mean_squared_error(test, pred))
-    return rmse_
-
-
-# Print the scores
-def print_score(test, pred):
-
-
-    print(f"- Regressor: {regr.__class__.__name__}")
-    print(f"R²: {rsqr_score(test, pred)}")
-    print(f"RMSE: {rmse_score(test, pred)}\n")
-
-model_list = []
-r2_list = []
-rmse_list = []
-
-
-
-from sklearn.model_selection import GridSearchCV
-from sklearn.linear_model import Ridge
-
-# Bersihkan NaN pada X_train dan y_train
-train_df_clean = X_train.copy()
-train_df_clean["target"] = y_train
-
-# Drop baris yang targetnya NaN
-train_df_clean = train_df_clean.dropna(subset=["target"])
-
-# Pisah X_train dan y_train yang sudah bersih
-X_train_clean = train_df_clean.drop(columns=["target"])
-y_train_clean = train_df_clean["target"]
-
-if X_train_clean.isna().sum().sum() > 0:
-    print("⚠ Ada NaN di fitur, otomatis diisi dengan median.")
-    X_train_clean = X_train_clean.fillna(X_train_clean.median())
-
-#  Definisikan hyperparameter
-alphas = np.logspace(-5, 5, 50).tolist()
-tuned_parameters = {"alpha": alphas}
-
-# GridSearchCV
-ridge_cv = GridSearchCV(
-    Ridge(),
-    tuned_parameters,
-    cv=10,
-    n_jobs=-1,
-    verbose=1,
-    scoring="r2"
-)
-
-ridge_cv.fit(X_train_clean, y_train_clean)
-
-# Print hasil terbaik
-print(f"Best hyperparameters: {ridge_cv.best_params_}")
-print(f"Best R² (train CV): {ridge_cv.best_score_:.4f}")
-
-#  Model final
-ridge_mod = Ridge(alpha=ridge_cv.best_params_["alpha"])
-ridge_mod.fit(X_train_clean, y_train_clean)
-
-# Prediksi di X_test (juga dibersihkan dari NaN kalau ada)
-X_test_clean = X_test.fillna(X_test.median())
-y_pred = ridge_mod.predict(X_test_clean)
-
-#  Hasil evaluasi
-print(f"- {ridge_mod.__class__.__name__}")
-print(f"R²: {rsqr_score(y_test, y_pred):.4f}")
-print(f"RMSE: {rmse_score(y_test, y_pred):.4f}")
-
-# Simpan hasil
-model_list.append(ridge_mod.__class__.__name__)
-r2_list.append(round(rsqr_score(y_test, y_pred), 4))
-rmse_list.append(round(rmse_score(y_test, y_pred), 4))
-
-import matplotlib.pyplot as plt
-
-# Plot Actual vs Predicted Price
-plt.figure(figsize=(8, 6))
-plt.title("Actual vs Predicted Prices (Ridge Regression)", fontsize=16)
-
-plt.scatter(y_test, y_pred,
-            color="deepskyblue", marker="o", facecolors="none", alpha=0.5)
-
-# Garis referensi 45 derajat
-min_price = min(y_test.min(), y_pred.min())
-max_price = max(y_test.max(), y_pred.max())
-plt.plot([min_price, max_price], [min_price, max_price], "darkorange", lw=2)
-
-plt.xlabel("Actual Price", fontsize=14)
-plt.ylabel("Predicted Price", fontsize=14)
-plt.grid(True, linestyle="--", alpha=0.6)
-plt.show()
-
-"""###6.2.2. Lasso regression"""
-
-from sklearn.linear_model import Lasso
-
-alphas = np.logspace(-5, 5, 50).tolist()
-#lasso_params = {"alpha": alphas, "max_iter": [1000, 5000, 10000]}
-lasso_params = {"alpha": alphas}
-
-lasso_cv = GridSearchCV(Lasso(), lasso_params, cv=10, n_jobs=-1, verbose=1)
-lasso_cv.fit(dataset_train_x, dataset_train_y)
-
-print(f"Best hyperparameters: {lasso_cv.best_params_}")
-print(f"Best R² (train): {lasso_cv.best_score_}")
-
-lasso_mod = Lasso(**lasso_cv.best_params_)
-lasso_mod.fit(dataset_train_x, dataset_train_y)
-
-y_pred = lasso_mod.predict(dataset_test_x)
-
-model_list.append(lasso_mod.__class__.__name__)
-r2_list.append(round(rsqr_score(dataset_test_y, y_pred), 4))
-rmse_list.append(round(rmse_score(dataset_test_y, y_pred), 4))
-
-plt.figure()
-plt.title("Actual vs. Predicted Selling Price (Lasso)", fontsize=20)
-plt.scatter(dataset_test_y, y_pred, color="deepskyblue", marker="o", facecolors="none")
-plt.plot([dataset_test_y.min(), dataset_test_y.max()],
-         [dataset_test_y.min(), dataset_test_y.max()],
-         "darkorange", lw=2)
-plt.xlabel("\nActual Price", fontsize=16)
-plt.ylabel("Predicted Price\n", fontsize=16)
-plt.show()
-
-"""###6.2.3. XGBoost regression"""
-
-xgb_params = {
-    "max_depth": [3],
-    "colsample_bytree": [0.3, 0.7],
-    "learning_rate": [0.01, 0.05, 0.1],
-    "n_estimators": [100, 500]
-}
-
-xgb_cv = GridSearchCV(XGBRegressor(objective="reg:squarederror", random_state=42),
-                      xgb_params, cv=5, n_jobs=-1, verbose=1)
-xgb_cv.fit(dataset_train_x, dataset_train_y)
-
-print(f"Best hyperparameters: {xgb_cv.best_params_}")
-print(f"Best R² (train): {xgb_cv.best_score_}")
-
-xgb_mod = XGBRegressor(**xgb_cv.best_params_, objective="reg:squarederror", random_state=42)
-xgb_mod.fit(dataset_train_x, dataset_train_y)
-
-y_pred = xgb_mod.predict(dataset_test_x)
-
-model_list.append(xgb_mod.__class__.__name__)
-r2_list.append(round(rsqr_score(dataset_test_y, y_pred), 4))
-rmse_list.append(round(rmse_score(dataset_test_y, y_pred), 4))
-
-plt.figure()
-plt.title("Actual vs. Predicted Selling Price (XGBoost)", fontsize=20)
-plt.scatter(dataset_test_y, y_pred, color="deepskyblue", marker="o", facecolors="none")
-plt.plot([dataset_test_y.min(), dataset_test_y.max()],
-         [dataset_test_y.min(), dataset_test_y.max()],
-         "darkorange", lw=2)
-plt.xlabel("\nActual Price", fontsize=16)
-plt.ylabel("Predicted Price\n", fontsize=16)
-plt.show()
-
-"""###6.2.4. LightGBM regression"""
-
-lgbm_params = {
-    'num_leaves': [31],
-    'reg_alpha': [0.1],
-    'n_estimators': [100, 200], # Reduced the number of estimators
-    'learning_rate': [0.05, 0.1], # Reduced the number of learning rates
-}
-
-lgbm_cv = GridSearchCV(LGBMRegressor(random_state=42),
-                       lgbm_params, cv=5, n_jobs=-1, verbose=1) # Reduced cross-validation folds
-lgbm_cv.fit(dataset_train_x, dataset_train_y)
-
-print(f"Best hyperparameters: {lgbm_cv.best_params_}")
-print(f"Best R² (train): {lgbm_cv.best_score_}")
-
-lgbm_mod = LGBMRegressor(**lgbm_cv.best_params_, random_state=42)
-lgbm_mod.fit(dataset_train_x, dataset_train_y)
-
-y_pred = lgbm_mod.predict(dataset_test_x)
-
-model_list.append(lgbm_mod.__class__.__name__)
-r2_list.append(round(rsqr_score(dataset_test_y, y_pred), 4))
-rmse_list.append(round(rmse_score(dataset_test_y, y_pred), 4))
-
-plt.figure()
-plt.title("Actual vs. Predicted Selling Price (LightGBM)", fontsize=20)
-plt.scatter(dataset_test_y, y_pred, color="deepskyblue", marker="o", facecolors="none")
-plt.plot([dataset_test_y.min(), dataset_test_y.max()],
-         [dataset_test_y.min(), dataset_test_y.max()],
-         "darkorange", lw=2)
-plt.xlabel("\nActual Price", fontsize=16)
-plt.ylabel("Predicted Price\n", fontsize=16)
-plt.show()
-
-"""###6.2.5 Linear Regression"""
-
-from sklearn.linear_model import LinearRegression
-
-linreg_params = {
-    "fit_intercept": [True, False],
-    "positive": [True, False]
-}
-
-linreg_cv = GridSearchCV(LinearRegression(), linreg_params, cv=10, n_jobs=-1, verbose=1)
-linreg_cv.fit(dataset_train_x, dataset_train_y)
-
-print(f"Best hyperparameters: {linreg_cv.best_params_}")
-print(f"Best R² (train): {linreg_cv.best_score_}")
-
-linreg_mod = LinearRegression(**linreg_cv.best_params_)
-linreg_mod.fit(dataset_train_x, dataset_train_y)
-
-y_pred = linreg_mod.predict(dataset_test_x)
-
-model_list.append(linreg_mod.__class__.__name__)
-r2_list.append(round(rsqr_score(dataset_test_y, y_pred), 4))
-rmse_list.append(round(rmse_score(dataset_test_y, y_pred), 4))
-
-plt.figure()
-plt.title("Actual vs. Predicted Selling Price (Linear Regression)", fontsize=20)
-plt.scatter(dataset_test_y, y_pred, color="deepskyblue", marker="o", facecolors="none")
-plt.plot([dataset_test_y.min(), dataset_test_y.max()],
-         [dataset_test_y.min(), dataset_test_y.max()],
-         "darkorange", lw=2)
-plt.xlabel("\nActual Price", fontsize=16)
-plt.ylabel("Predicted Price\n", fontsize=16)
-plt.show()
-
-"""##6.3. Choosing the Best Model"""
-
 import pickle
-import pandas as pd
 
-# Buat DataFrame hasil evaluasi
-results_df = pd.DataFrame({
-    "Model": model_list,
-    "R2": r2_list,
-    "RMSE": rmse_list
-})
+# --- KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="Prediksi Harga Mobil", layout="wide")
 
-print("\n=== Hasil Evaluasi Model ===")
-print(results_df)
+st.title("🚗 Dashboard Prediksi Harga Mobil")
+st.markdown("Analisis Data dan Pemodelan Machine Learning")
 
-# Pilih model terbaik → R² tertinggi, jika seri cek RMSE terendah
-best_index = results_df.sort_values(by=["R2", "RMSE"], ascending=[False, True]).index[0]
-best_model_name = results_df.loc[best_index, "Model"]
+# --- 1. LOAD DATA & CLEANING (CACHED) ---
+@st.cache_data
+def load_and_clean_data():
+    # Load Data
+    dataset = pd.read_csv('car_prices.csv') # Pastikan nama file sesuai
+    
+    # Drop kolom tidak terpakai
+    if 'vin' in dataset.columns:
+        dataset = dataset.drop(columns=['vin', 'saledate'], errors='ignore')
+    
+    # Cleaning Float ke NaN
+    cols_to_check = ['make', 'model', 'trim', 'body', 'transmission', 'color', 'interior']
+    for col in cols_to_check:
+        dataset[col] = dataset[col].apply(lambda x: np.nan if isinstance(x, float) else x)
+    
+    # Imputasi Numerik (Median)
+    dataset_num = dataset.select_dtypes(exclude=['object'])
+    cols_to_fill_num = ['condition', 'odometer', 'mmr', 'sellingprice']
+    for col in cols_to_fill_num:
+        if col in dataset_num.columns:
+            median_val = dataset_num[col].median()
+            dataset_num[col] = dataset_num[col].fillna(median_val)
+            dataset[col] = dataset[col].fillna(median_val) # Update dataset utama juga
+            
+    # Imputasi Kategorikal (Others)
+    dataset_categ = dataset.select_dtypes(include=['object'])
+    cols_to_fill_cat = ['make', 'model', 'trim', 'body', 'transmission', 'color', 'interior']
+    for col in cols_to_fill_cat:
+        if col in dataset_categ.columns:
+            dataset[col] = dataset[col].fillna('others')
+            
+    # Cleaning khusus Transmission
+    dataset['transmission'] = dataset['transmission'].replace(['sedan', 'Sedan'], np.nan)
+    dataset['transmission'] = dataset['transmission'].fillna('others')
+    
+    return dataset
 
-print(f"\nBest Model: {best_model_name}")
+# --- 2. FEATURE ENGINEERING (CACHED) ---
+@st.cache_data
+def process_features(dataset):
+    # Copy dataset agar tidak merusak yang asli
+    df_processed = dataset.copy()
+    
+    # Simpan sellingprice
+    sellingprice = df_processed['sellingprice']
+    
+    # One-Hot Encoding untuk Transmission
+    if 'transmission' in df_processed.columns:
+        ohe = OneHotEncoder(sparse_output=False, drop=None)
+        transmission_encoded = ohe.fit_transform(df_processed[['transmission']])
+        transmission_df = pd.DataFrame(
+            transmission_encoded,
+            columns=[f"transmission_{cat}" for cat in ohe.categories_[0]],
+            index=df_processed.index
+        )
+        df_processed = pd.concat([df_processed.drop(columns=['transmission']), transmission_df], axis=1)
+        
+    # Label Encoding untuk kolom kategorikal lainnya
+    categorical_cols = df_processed.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        le = LabelEncoder()
+        df_processed[col] = le.fit_transform(df_processed[col].astype(str))
+        
+    # Scaling (kecuali target)
+    scaler = StandardScaler()
+    cols_to_scale = df_processed.columns.drop('sellingprice')
+    df_processed[cols_to_scale] = scaler.fit_transform(df_processed[cols_to_scale])
+    
+    # Kembalikan sellingprice (target)
+    df_processed['sellingprice'] = sellingprice
+    
+    return df_processed
 
-# Ambil objek model dari variabel yang sudah dibuat sebelumnya
-model_dict = {
-    "Ridge": ridge_mod,
-    "Lasso": lasso_mod,
-    "XGBRegressor": xgb_mod,
-    "LGBMRegressor": lgbm_mod,
-    "LinearRegression": linreg_mod,
-}
-best_model = model_dict[best_model_name]
+# --- EKSEKUSI UTAMA ---
 
-"""##6.4. Prediction on Real Test Dataset"""
+try:
+    # Load Data
+    with st.spinner('Sedang memuat data...'):
+        df = load_and_clean_data()
+        df_ready = process_features(df)
+        
+    # Membuat Tabs
+    tab1, tab2, tab3 = st.tabs(["📊 Data Overview", "📈 EDA", "🤖 Modelling"])
 
-from sklearn.metrics import r2_score, mean_squared_error
-import numpy as np
+    # --- TAB 1: DATA OVERVIEW ---
+    with tab1:
+        st.subheader("Dataset Preview")
+        st.dataframe(df.head())
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("Shape Data:", df.shape)
+            st.write("Tipe Data:")
+            st.write(df.dtypes)
+        with col2:
+            st.write("Statistik Deskriptif:")
+            st.write(df.describe())
 
-real_predictions = best_model.predict(dataset_test_x)
+    # --- TAB 2: EDA ---
+    with tab2:
+        st.subheader("Distribusi Data Numerik")
+        
+        num_cols = df.select_dtypes(include=['number']).columns
+        # Hapus kolom hasil one-hot encoding dari visualisasi agar tidak penuh
+        viz_cols = [c for c in num_cols if not c.startswith('transmission_')]
+        
+        selected_col = st.selectbox("Pilih kolom untuk histogram:", viz_cols)
+        
+        fig, ax = plt.subplots(figsize=(10, 5))
+        sns.histplot(df[selected_col], kde=True, ax=ax, color="deepskyblue")
+        st.pyplot(fig)
+        
+        st.subheader("Korelasi Heatmap")
+        if st.checkbox("Tampilkan Heatmap (Mungkin lambat)"):
+            fig2, ax2 = plt.subplots(figsize=(10, 8))
+            sns.heatmap(df[viz_cols].corr(), annot=True, fmt=".2f", cmap='coolwarm', ax=ax2)
+            st.pyplot(fig2)
 
-# Gabung hasil prediksi ke DataFrame
-pred_df = pd.DataFrame({
-    "Actual": dataset_test_y,  # jika ada label asli
-    "Predicted": real_predictions
-})
-print("\n=== Hasil Prediksi pada Real Dataset ===")
-print(pred_df.head())
+    # --- TAB 3: MODELLING ---
+    with tab3:
+        st.warning("⚠️ Training model menggunakan GridSearchCV memakan waktu lama. Klik tombol di bawah untuk memulai.")
+        
+        if st.button("Mulai Training Model"):
+            # Splitting Data
+            X = df_ready.drop(columns=['sellingprice'])
+            y = df_ready['sellingprice']
+            
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            
+            # Progress Bar
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            results = []
+            models_to_train = {
+                "Ridge": Ridge(),
+                "Lasso": Lasso(),
+                "XGBoost": XGBRegressor(objective="reg:squarederror", random_state=42),
+                "LightGBM": LGBMRegressor(random_state=42),
+                "Linear Regression": LinearRegression()
+            }
+            
+            # Parameter Grid (Disederhanakan agar tidak Timeout di Streamlit Cloud)
+            # Kita kurangi jumlah iterasi/cv agar cepat
+            params = {
+                "Ridge": {"alpha": [0.1, 1.0, 10.0]},
+                "Lasso": {"alpha": [0.1, 1.0, 10.0]},
+                "XGBoost": {"n_estimators": [50, 100], "max_depth": [3], "learning_rate": [0.1]},
+                "LightGBM": {"n_estimators": [50, 100], "num_leaves": [31]},
+                "Linear Regression": {"fit_intercept": [True, False]}
+            }
+            
+            best_model_overall = None
+            best_r2_overall = -1
+            best_name_overall = ""
+            
+            total_models = len(models_to_train)
+            current_step = 0
 
-# Calculate evaluation metrics
-r2 = r2_score(dataset_test_y, real_predictions)
-rmse = np.sqrt(mean_squared_error(dataset_test_y, real_predictions))
-mape = np.mean(np.abs((dataset_test_y - real_predictions) / dataset_test_y)) * 100
+            # Loop Training
+            for name, model in models_to_train.items():
+                status_text.text(f"Training {name}...")
+                
+                # Handle NaN jika masih ada sisa (Safety net)
+                X_train = X_train.fillna(0)
+                X_test = X_test.fillna(0)
 
-print("\n=== Evaluation Metrics ===")
-print(f"R2: {r2:.4f}")
-print(f"RMSE: {rmse:.4f}")
-print(f"MAPE: {mape:.4f}%")
+                grid = GridSearchCV(model, params[name], cv=3, n_jobs=-1, scoring='r2')
+                grid.fit(X_train, y_train)
+                
+                y_pred = grid.best_estimator_.predict(X_test)
+                
+                r2 = r2_score(y_test, y_pred)
+                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                
+                results.append({"Model": name, "R2": r2, "RMSE": rmse})
+                
+                if r2 > best_r2_overall:
+                    best_r2_overall = r2
+                    best_model_overall = grid.best_estimator_
+                    best_name_overall = name
+                
+                current_step += 1
+                progress_bar.progress(current_step / total_models)
 
-dataset_test_x.head()
+            status_text.text("Training Selesai!")
+            
+            # Tampilkan Hasil
+            st.subheader("Hasil Evaluasi Model")
+            results_df = pd.DataFrame(results).sort_values(by="R2", ascending=False)
+            st.dataframe(results_df)
+            
+            st.success(f"🏆 Model Terbaik: **{best_name_overall}** dengan R²: {best_r2_overall:.4f}")
+            
+            # Plot Actual vs Predicted untuk model terbaik
+            st.subheader(f"Prediksi vs Aktual ({best_name_overall})")
+            y_pred_best = best_model_overall.predict(X_test)
+            
+            fig_res, ax_res = plt.subplots(figsize=(8, 6))
+            ax_res.scatter(y_test, y_pred_best, color="deepskyblue", alpha=0.5)
+            ax_res.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], "darkorange", lw=2)
+            ax_res.set_xlabel("Actual Price")
+            ax_res.set_ylabel("Predicted Price")
+            ax_res.set_title(f"Actual vs Predicted ({best_name_overall})")
+            st.pyplot(fig_res)
+            
+            # Simpan Model
+            # (Optional di Streamlit Cloud karena file akan hilang saat reboot, 
+            # tapi bagus untuk fitur download)
+            with open("best_model.pkl", "wb") as f:
+                pickle.dump(best_model_overall, f)
+            
+            with open("best_model.pkl", "rb") as f:
+                st.download_button("Download Best Model (.pkl)", f, file_name="best_model_car_price.pkl")
 
-
-with open(f"{best_model_name}_best_model.pkl", "wb") as f:
-    pickle.dump(best_model, f)
-
-print(f"\nModel terbaik '{best_model_name}' berhasil disimpan sebagai pickle.")
-
-
+except FileNotFoundError:
+    st.error("❌ File 'car_prices.csv' tidak ditemukan. Pastikan file sudah diupload ke GitHub dan namanya sesuai (case-sensitive).")
+except Exception as e:
+    st.error(f"Terjadi kesalahan: {e}")
