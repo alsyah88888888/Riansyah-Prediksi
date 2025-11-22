@@ -25,7 +25,7 @@ import matplotlib.pyplot as plt
 
 """# 1.&nbsp;Import Dataset"""
 
-dataset = pd.read_csv('/kaggle/input/vehicle-sales-data/car_prices.csv')
+dataset = pd.read_csv('car_prices.csv')
 
 """# 2.&nbsp;Evaluate Data Structure"""
 
